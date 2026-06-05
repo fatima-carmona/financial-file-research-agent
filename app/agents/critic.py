@@ -10,6 +10,7 @@ Returns a structured verdict rather than free text so the graph can branch
 on it (approve vs. request revision).
 """
 import json
+import re
 
 from app.agents.llm import get_chat_model
 
@@ -25,7 +26,8 @@ misattributed to the wrong company).
 4. Give a final verdict: "approved" if the answer is well-grounded, or \
 "needs_revision" if it contains unsupported or misattributed claims.
 
-Respond ONLY with valid JSON in this exact shape, no other text:
+Respond ONLY with valid JSON in this exact shape, no other text, no markdown \
+code fences, no explanation before or after the JSON:
 {
   "verdict": "approved" | "needs_revision",
   "unsupported_claims": ["..."],
@@ -46,6 +48,26 @@ def build_prompt(question: str, draft_answer: str, chunks: list[dict]) -> str:
     )
 
 
+def _extract_json(raw: str) -> str:
+    """
+    Chat models — Gemini in particular — often wrap JSON in markdown code
+    fences (```json ... ```) or add stray text around it even when told not
+    to. Strip fences first, then fall back to grabbing the outermost {...}
+    block if there's still leading/trailing text.
+    """
+    text = raw.strip()
+
+    fence_match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
+    if fence_match:
+        return fence_match.group(1).strip()
+
+    brace_match = re.search(r"\{.*\}", text, re.DOTALL)
+    if brace_match:
+        return brace_match.group(0).strip()
+
+    return text
+
+
 def run(question: str, draft_answer: str, chunks: list[dict]) -> dict:
     """Agent entrypoint used by the LangGraph orchestrator."""
     llm = get_chat_model()
@@ -59,14 +81,16 @@ def run(question: str, draft_answer: str, chunks: list[dict]) -> dict:
     )
 
     try:
-        verdict = json.loads(response.content)
+        verdict = json.loads(_extract_json(response.content))
     except json.JSONDecodeError:
-        # Fail safe: if the critic didn't return clean JSON, don't silently
-        # approve — flag it for human review instead.
+        # Fail safe: if the critic still didn't return parseable JSON, don't
+        # silently approve — flag it for human review instead, but keep the
+        # raw response so it's possible to see what actually went wrong.
         verdict = {
             "verdict": "needs_revision",
             "unsupported_claims": [],
             "notes": "Critic response was not valid JSON; flagging for review.",
+            "raw_response": response.content,
         }
 
     return verdict
