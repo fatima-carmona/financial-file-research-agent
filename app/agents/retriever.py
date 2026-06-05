@@ -4,20 +4,17 @@ Retriever Agent
 Embeds the incoming question and does a cosine-similarity search over the
 `chunks` table (pgvector) to pull back the most relevant filing sections.
 """
-from langchain_openai import OpenAIEmbeddings
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.agents.embeddings import get_embeddings_model
 from app.db.models import Chunk
 
 TOP_K = 6
 
 
 def embed_query(question: str) -> list[float]:
-    embedder = OpenAIEmbeddings(
-        model="text-embedding-3-small", api_key=settings.openai_api_key
-    )
+    embedder = get_embeddings_model()
     return embedder.embed_query(question)
 
 

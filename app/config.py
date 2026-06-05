@@ -8,11 +8,14 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # LLM
-    llm_provider: str = "openai"  # "openai" | "anthropic"
+    llm_provider: str = "google"  # "openai" | "anthropic" | "google"
     openai_api_key: str = ""
     anthropic_api_key: str = ""
+    google_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     anthropic_model: str = "claude-sonnet-4-6"
+    google_model: str = "gemini-2.5-flash"
+    google_embedding_model: str = "models/text-embedding-004"
 
     # Postgres
     postgres_user: str = "filing_agent"

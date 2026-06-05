@@ -11,9 +11,8 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 from llama_index.core.node_parser import SentenceSplitter
-from langchain_openai import OpenAIEmbeddings
 
-from app.config import settings
+from app.agents.embeddings import get_embeddings_model
 from app.db.session import SessionLocal, engine, Base
 from app.db.models import Filing, Chunk
 
@@ -48,9 +47,7 @@ def chunk_text(text: str) -> list[str]:
 
 
 def embed_chunks(chunks: list[str]) -> list[list[float]]:
-    embedder = OpenAIEmbeddings(
-        model="text-embedding-3-small", api_key=settings.openai_api_key
-    )
+    embedder = get_embeddings_model()
     return embedder.embed_documents(chunks)
 
 
