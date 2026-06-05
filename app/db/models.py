@@ -4,9 +4,10 @@ Data model:
 Filing   — one row per ingested SEC filing (e.g. Citigroup 10-K, FY2025)
 Chunk    — one row per text chunk of a filing, with its embedding vector
 
-Embedding dimension is set for Google's text-embedding-004 (768 dims), the
-default free-tier embedding model used by this project. Change EMBEDDING_DIM
-if you swap embedding models (e.g. 1536 for OpenAI's text-embedding-3-small).
+Embedding dimension is set for sentence-transformers/all-MiniLM-L6-v2 (384
+dims), the default local/free embedding model used by this project. Change
+EMBEDDING_DIM if you swap embedding models (e.g. 1536 for OpenAI's
+text-embedding-3-small, or 3072 for Google's gemini-embedding-001).
 """
 from datetime import datetime, timezone
 
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
-EMBEDDING_DIM = 768
+EMBEDDING_DIM = 384
 
 
 class Filing(Base):

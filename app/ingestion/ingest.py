@@ -6,6 +6,11 @@ Reads company name / filing dates automatically from the metadata.json file
 that download_filings.py writes alongside each ticker's documents — no need
 to pass --company-name manually.
 
+Embedding runs locally by default (see app/agents/embeddings.py), so there's
+no external rate limit to manage here — a full 10-K's worth of chunks embeds
+in one pass. The first run will download the embedding model (~90MB) from
+Hugging Face and cache it locally; subsequent runs are fast and fully offline.
+
 Usage:
     python -m app.ingestion.ingest --path data/filings/C
     python -m app.ingestion.ingest --path data/filings/JPM
@@ -24,6 +29,7 @@ from app.db.models import Filing, Chunk
 
 CHUNK_SIZE = 800       # tokens, roughly
 CHUNK_OVERLAP = 100
+EMBED_BATCH_SIZE = 100  # just for progress logging, not rate limiting
 
 
 def clean_html(raw_html: str) -> str:
@@ -54,7 +60,15 @@ def chunk_text(text: str) -> list[str]:
 
 def embed_chunks(chunks: list[str]) -> list[list[float]]:
     embedder = get_embeddings_model()
-    return embedder.embed_documents(chunks)
+    all_embeddings: list[list[float]] = []
+    total_batches = (len(chunks) + EMBED_BATCH_SIZE - 1) // EMBED_BATCH_SIZE
+
+    for batch_num, i in enumerate(range(0, len(chunks), EMBED_BATCH_SIZE), start=1):
+        batch = chunks[i : i + EMBED_BATCH_SIZE]
+        print(f"  Embedding batch {batch_num}/{total_batches} ({len(batch)} chunks)...")
+        all_embeddings.extend(embedder.embed_documents(batch))
+
+    return all_embeddings
 
 
 def load_metadata(filings_dir: Path) -> dict:

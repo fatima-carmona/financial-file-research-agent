@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # LLM
+    # LLM (chat/reasoning — used by Analyst and Critic agents)
     llm_provider: str = "google"  # "openai" | "anthropic" | "google"
     openai_api_key: str = ""
     anthropic_api_key: str = ""
@@ -15,7 +15,14 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     anthropic_model: str = "claude-sonnet-4-6"
     google_model: str = "gemini-2.5-flash"
-    google_embedding_model: str = "models/text-embedding-004"
+
+    # Embeddings (used by ingestion and retrieval) — separate from llm_provider
+    # since embedding rate limits/costs differ a lot from chat. Default is
+    # "local": runs on your machine via sentence-transformers, no API calls,
+    # no rate limits, free.
+    embedding_provider: str = "local"  # "local" | "google" | "openai"
+    local_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    google_embedding_model: str = "models/gemini-embedding-001"
 
     # Postgres
     postgres_user: str = "filing_agent"
