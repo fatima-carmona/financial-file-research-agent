@@ -1,0 +1,28 @@
+# Environment
+.env
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Data (filings can be large — don't commit raw downloads)
+data/
+*.pdf
+*.htm
+*.html
+
+# Docker
+*.log
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
