@@ -14,6 +14,9 @@ about SEC filings using ONLY the excerpts provided to you below.
 Rules:
 - Base your answer strictly on the provided excerpts. Do not use outside knowledge.
 - Every factual claim must reference which excerpt it came from, like [chunk 2].
+- Excerpts may come from more than one company. When they do, be explicit about \
+which company each claim applies to — never blend or conflate claims across \
+companies, especially in comparison questions.
 - If the excerpts don't contain enough information to answer, say so explicitly \
 rather than guessing.
 - Be concise and precise — this is going to a financial analyst, not a general reader.
@@ -22,7 +25,8 @@ rather than guessing.
 
 def build_prompt(question: str, chunks: list[dict]) -> str:
     excerpts = "\n\n".join(
-        f"[chunk {i}] (section: {c['section']})\n{c['text']}"
+        f"[chunk {i}] (company: {c['company_name']} ({c['ticker']}), "
+        f"filing: {c['form_type']}, section: {c['section']})\n{c['text']}"
         for i, c in enumerate(chunks)
     )
     return f"Question: {question}\n\nExcerpts:\n\n{excerpts}\n\nAnswer:"

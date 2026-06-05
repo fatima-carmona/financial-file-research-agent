@@ -18,6 +18,7 @@ from app.agents import retriever, analyst, critic
 
 class GraphState(TypedDict):
     question: str
+    tickers: list[str] | None
     chunks: list[dict]
     draft_answer: str
     verdict: dict
@@ -35,7 +36,7 @@ def build_graph(db: Session):
     """
 
     def retrieve_node(state: GraphState) -> GraphState:
-        result = retriever.run(db, state["question"])
+        result = retriever.run(db, state["question"], tickers=state.get("tickers"))
         return {**state, "chunks": result["chunks"]}
 
     def analyze_node(state: GraphState) -> GraphState:
@@ -75,10 +76,11 @@ def build_graph(db: Session):
     return graph.compile()
 
 
-def run_query(db: Session, question: str) -> dict:
+def run_query(db: Session, question: str, tickers: list[str] | None = None) -> dict:
     app_graph = build_graph(db)
     initial_state: GraphState = {
         "question": question,
+        "tickers": tickers,
         "chunks": [],
         "draft_answer": "",
         "verdict": {},
@@ -89,7 +91,13 @@ def run_query(db: Session, question: str) -> dict:
         "answer": final_state["draft_answer"],
         "verdict": final_state["verdict"],
         "sources": [
-            {"section": c["section"], "text": c["text"][:300] + "..."}
+            {
+                "company": c["company_name"],
+                "ticker": c["ticker"],
+                "form_type": c["form_type"],
+                "section": c["section"],
+                "text": c["text"][:300] + "...",
+            }
             for c in final_state["chunks"]
         ],
     }

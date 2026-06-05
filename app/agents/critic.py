@@ -18,9 +18,12 @@ draft answer against the source excerpts it was supposed to be based on.
 
 For the draft answer, determine:
 1. Is every claim supported by the provided excerpts?
-2. List any claims that are NOT clearly supported (unsupported or overstated claims).
-3. Give a final verdict: "approved" if the answer is well-grounded, or \
-"needs_revision" if it contains unsupported claims.
+2. If excerpts come from more than one company, does the draft correctly \
+attribute each claim to the right company, without blending or conflating them?
+3. List any claims that are NOT clearly supported (unsupported, overstated, or \
+misattributed to the wrong company).
+4. Give a final verdict: "approved" if the answer is well-grounded, or \
+"needs_revision" if it contains unsupported or misattributed claims.
 
 Respond ONLY with valid JSON in this exact shape, no other text:
 {
@@ -33,7 +36,8 @@ Respond ONLY with valid JSON in this exact shape, no other text:
 
 def build_prompt(question: str, draft_answer: str, chunks: list[dict]) -> str:
     excerpts = "\n\n".join(
-        f"[chunk {i}] {c['text']}" for i, c in enumerate(chunks)
+        f"[chunk {i}] (company: {c['company_name']} ({c['ticker']}))\n{c['text']}"
+        for i, c in enumerate(chunks)
     )
     return (
         f"Original question: {question}\n\n"
