@@ -176,17 +176,107 @@ curl http://localhost:8000/filings
 docker compose up --build
 ```
 
+## Testing
+
+The system has been ingested with 10-K filings from six major banks
+(Citigroup, JPMorgan, Bank of America, Wells Fargo, Goldman Sachs, Morgan
+Stanley) and tested against 10 queries spanning single-company lookups,
+multi-company comparisons, and adversarial cases designed to probe whether
+the Critic agent actually catches problems rather than rubber-stamping
+everything.
+
+**Single-company factual queries** — correctly retrieved and cited specific
+figures (e.g., JPMorgan's Credit Portfolio VaR, Wells Fargo's operational
+risk disclosures), attributing every claim back to its source chunk.
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What does JPMorgan say about its Credit Portfolio VaR?", "tickers": ["JPM"]}'
+```
+
+**Multi-company comparisons (2-3 companies, explicit tickers)** — correctly
+pulled and compared numeric figures (e.g., CET1 capital ratios between Bank
+of America and Morgan Stanley) and qualitative risk descriptions (market risk
+across Goldman Sachs, Morgan Stanley, and Citigroup) without blending or
+misattributing claims between companies.
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Compare the CET1 capital ratios reported by Bank of America and Morgan Stanley.", "tickers": ["BAC", "MS"]}'
+```
+
+**Grounding / hallucination-resistance tests** — asked questions the filings
+can't answer (a stock price target, a recent CEO interview). In both cases
+the system correctly reported that the source material didn't contain the
+answer instead of inventing one.
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is Wall Street'"'"'s current stock price target for Citigroup?", "tickers": ["C"]}'
+```
+
+**False-premise test** — asked a question built on an incorrect assumption
+("since Goldman Sachs completely exited consumer banking in 2025..."). The
+system answered around the false premise rather than rejecting it outright —
+see Known Limitations below.
+
+**All-six open comparison (no ticker filter)** — asked to compare climate
+risk disclosures and, separately, cybersecurity risk themes across all six
+banks with no `tickers` specified. This exercised the balanced per-company
+retrieval logic across every ingested company at once, correctly noting when
+one bank's retrieved excerpts didn't cover the topic instead of hallucinating
+a claim on that bank's behalf — but also exposed a real scaling limitation
+(next section).
+
+## Known limitations
+
+Being upfront about where this breaks is as useful as showing where it
+works — these are the real edges found through testing, not hypothetical
+ones:
+
+- **Broad, filter-free queries across many companies can exceed Gemini's
+  free-tier token-per-minute limit.** With 6 companies ingested, an
+  unfiltered query retrieves `top_k` chunks from *each* company (36 chunks
+  total) and sends all of it to the Analyst in one call. This occasionally
+  triggered a rate-limit error during testing. A production version would
+  scale `top_k` down as the number of companies grows, or use a map-reduce
+  pattern (summarize each company's relevant chunks independently, then
+  synthesize the summaries) instead of sending every raw chunk from every
+  company in a single prompt.
+- **No automatic company-name-to-ticker resolution.** If a question names a
+  specific company (e.g., "What does Goldman Sachs say about Marcus?") but
+  the caller doesn't also pass `tickers: ["GS"]`, the system has no way to
+  know the question was scoped to one company — it defaults to searching
+  every ingested company. The fix would be a lightweight step that extracts
+  company names from the question and resolves them to tickers before
+  retrieval, rather than requiring the caller to specify `tickers` manually.
+- **The Critic verifies the Analyst's answer against source chunks, but
+  doesn't currently challenge false premises embedded in the question
+  itself.** Asking a question built on an incorrect assumption gets answered
+  around the assumption rather than the assumption being flagged outright.
+  A stronger version would have the Critic (or a dedicated step) check the
+  question's own premises against retrieved chunks before the Analyst
+  answers, not just check the Analyst's output afterward.
+
 ## Status / roadmap
 
 This is an actively-developed portfolio project. Current focus:
 
 - [x] Project scaffold, DB models, Docker setup
 - [x] EDGAR ingestion script (multi-company, per-ticker folders)
-- [x] Retriever agent (pgvector similarity search, optional ticker filtering)
+- [x] Retriever agent (pgvector similarity search, balanced per-company search)
 - [x] Analyst agent (grounded answer generation, per-company attribution)
 - [x] Critic agent (claim verification + cross-company misattribution checks)
 - [x] LangGraph wiring (retrieve → analyze → critique, with revision loop)
 - [x] FastAPI endpoint (`/query`, `/filings`, `/health`)
-- [ ] Tests beyond the health-check smoke test
-- [ ] Example queries + sample output in README
-- [ ] Ingest a few more companies for richer comparison demos
+- [x] Ingested 6 major banks (C, JPM, BAC, WFC, GS, MS) and ran 10 test queries
+- [x] Example queries + results documented above
+- [ ] Tests beyond the health-check smoke test (formalize the manual test
+      queries above into actual pytest cases)
+- [ ] Adaptive retrieval scope to avoid token-limit errors on broad,
+      many-company queries
+- [ ] Automatic company-name → ticker resolution
+- [ ] Critic (or a new agent) checks question premises, not just answer claims
