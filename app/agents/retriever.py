@@ -12,6 +12,15 @@ from app.db.models import Chunk, Filing
 
 TOP_K = 6
 
+# Total chunks sent to the Analyst is capped regardless of how many companies
+# are involved. Without this, a query spanning N companies retrieves top_k
+# chunks from EACH one — with 6 companies at top_k=6 that's 36 chunks in a
+# single prompt, which can exceed Gemini's free-tier tokens-per-minute limit.
+# Instead, per-company chunk count shrinks as company count grows, so total
+# context stays roughly constant whether you're comparing 2 companies or 6.
+MAX_TOTAL_CHUNKS = 24
+MIN_CHUNKS_PER_COMPANY = 2
+
 
 def embed_query(question: str) -> list[float]:
     embedder = get_embeddings_model()
@@ -49,22 +58,16 @@ def retrieve_chunks(
     top_k: int = TOP_K,
 ) -> list[Chunk]:
     """
-    Return the top_k most relevant Chunk rows for `question`, ranked by
-    cosine distance (pgvector's `<=>` operator via the Vector column type).
+    Return the most relevant Chunk rows for `question`, ranked by cosine
+    distance (pgvector's `<=>` operator via the Vector column type).
 
     When more than one company is in play — either because `tickers` names
     several, or because nothing was specified and multiple companies have
     been ingested — retrieval is done separately per company and then
-    merged, with top_k chunks from each company (not top_k split between
-    them), so every company gets full, comparable coverage.
-
-    This matters for comparison queries: a single global top_k search ranks
-    every chunk from every company together by similarity, and one company's
-    phrasing can simply score higher across the board, silently crowding the
-    other company out of the results entirely — the Analyst then has nothing
-    to say about the missing company, even though its filing almost
-    certainly covers the same topic. Searching per-company guarantees both
-    companies get a fair chance to contribute chunks.
+    merged, so every company gets a fair, comparable slice of the results
+    rather than one company's phrasing dominating a single global ranking
+    (see the module-level comment on MAX_TOTAL_CHUNKS for why the per-company
+    count shrinks as company count grows, rather than staying fixed at top_k).
     """
     query_embedding = embed_query(question)
     target_tickers = _get_target_tickers(db, tickers)
@@ -73,9 +76,13 @@ def retrieve_chunks(
         ticker = target_tickers[0] if target_tickers else None
         return _search(db, query_embedding, ticker, top_k)
 
+    per_company_k = max(
+        MIN_CHUNKS_PER_COMPANY, min(top_k, MAX_TOTAL_CHUNKS // len(target_tickers))
+    )
+
     chunks: list[Chunk] = []
     for ticker in target_tickers:
-        chunks.extend(_search(db, query_embedding, ticker, top_k))
+        chunks.extend(_search(db, query_embedding, ticker, per_company_k))
     return chunks
 
 

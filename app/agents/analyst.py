@@ -6,7 +6,7 @@ citing which chunk(s) each claim comes from. Grounding instructions are
 deliberately strict: the model is told to only use the provided chunks
 and to mark anything it's inferring beyond them.
 """
-from app.agents.llm import get_chat_model
+from app.agents.llm import get_chat_model, invoke_with_retry
 
 SYSTEM_PROMPT = """You are a financial research analyst. You answer questions \
 about SEC filings using ONLY the excerpts provided to you below.
@@ -37,11 +37,12 @@ def run(question: str, chunks: list[dict]) -> dict:
     llm = get_chat_model()
     prompt = build_prompt(question, chunks)
 
-    response = llm.invoke(
+    response = invoke_with_retry(
+        llm,
         [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
-        ]
+        ],
     )
 
     return {"draft_answer": response.content, "chunks_used": chunks}

@@ -12,7 +12,7 @@ on it (approve vs. request revision).
 import json
 import re
 
-from app.agents.llm import get_chat_model
+from app.agents.llm import get_chat_model, invoke_with_retry
 
 SYSTEM_PROMPT = """You are a fact-checking critic reviewing a financial analyst's \
 draft answer against the source excerpts it was supposed to be based on.
@@ -73,11 +73,12 @@ def run(question: str, draft_answer: str, chunks: list[dict]) -> dict:
     llm = get_chat_model()
     prompt = build_prompt(question, draft_answer, chunks)
 
-    response = llm.invoke(
+    response = invoke_with_retry(
+        llm,
         [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
-        ]
+        ],
     )
 
     try:
