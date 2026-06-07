@@ -12,7 +12,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./app/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-filing_agent}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-filing_agent} -d ${POSTGRES_DB:-filings}"]
       interval: 5s
       timeout: 5s
       retries: 5

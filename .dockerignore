@@ -1,0 +1,32 @@
+# Virtual environment — never needed in the image, and often gigabytes
+# (especially with torch/sentence-transformers installed). Not excluding
+# this is the single biggest cause of slow Docker builds in this project.
+venv/
+.venv/
+
+# Downloaded SEC filings — large, and not something the image needs baked
+# in; ingestion writes here at runtime via the mounted volume instead.
+data/
+
+# Git
+.git/
+.gitignore
+
+# Python cache/artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Env files (secrets) — passed in via env_file/environment in docker-compose,
+# never baked into the image
+.env
+
+# Editor/OS cruft
+.vscode/
+.idea/
+.DS_Store
+
+# Docs not needed inside the container
+README.md
